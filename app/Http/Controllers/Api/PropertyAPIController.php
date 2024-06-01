@@ -26,7 +26,7 @@ class PropertyAPIController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, $id)
     {
         $result = $this->propertyController->store($request, true);
         return $result;
@@ -37,23 +37,18 @@ class PropertyAPIController extends Controller
      */
     public function show(string $id)
     {
-        //
+        $result = $this->propertyController->show($id, true);
+        return $result;
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
 
     /**
      * Update the specified resource in storage.
      */
     public function update(Request $request, string $id)
     {
-        //
+        $result = $this->propertyController->update($request, true, $id);
+        return $result;
     }
 
     /**
@@ -61,6 +56,7 @@ class PropertyAPIController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        $result = $this->propertyController->destroy( $id, true);
+        return $result;
     }
 }

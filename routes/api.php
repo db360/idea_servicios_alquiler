@@ -23,5 +23,9 @@ Route::prefix('properties')->group(function(){
 
     Route::get('/', [PropertyAPIController::class, 'index'])->name('properties');
     Route::post('/create', [PropertyAPIController::class, 'store'])->name('properties.create');
+    Route::get('/{id}', [PropertyAPIController::class, 'show'])->name('properties.show');
+    Route::put('/{id}/update', [PropertyAPIController::class, 'update'])->name('properties.update');
+    Route::delete('/{id}', [PropertyAPIController::class, 'destroy'])->name('properties.destroy');
+
 
 });

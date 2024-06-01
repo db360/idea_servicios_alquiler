@@ -9,10 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Validator;
 
+use Illuminate\Support\MessageBag;
+
 class PropertyController extends Controller
 {
 
-    private function validateForms(Request $request, $isUpdate = false, $api = false) {
+    private function validateForms(Request $request, $isUpdate = false, $api = false)
+    {
 
 
         $rules = [
@@ -41,7 +44,7 @@ class PropertyController extends Controller
             'address.string' => 'La :attribute se debe de componer de caracteres',
             'address.min' => 'La :attribute no puede contener menos de :min caracteres',
         ];
-                // Si la solicitud es una solicitud API, maneja los datos en formato JSON
+        // Si la solicitud es una solicitud API, maneja los datos en formato JSON
         if ($api) {
             // Convierte los datos JSON en un array asociativo
             $data = json_decode($request->getContent(), true);
@@ -54,7 +57,7 @@ class PropertyController extends Controller
         }
 
 
-        $validator->setAttributeNames(['user_id'=> 'ID de usuario', 'title' => 'título', 'description'=>'descripción', 'address' => 'dirección', 'city' => 'ciudad', 'codigo_posta' => 'código postal']);
+        $validator->setAttributeNames(['user_id' => 'ID de usuario', 'title' => 'título', 'description' => 'descripción', 'address' => 'dirección', 'city' => 'ciudad', 'codigo_posta' => 'código postal']);
 
         return $validator;
     }
@@ -67,22 +70,19 @@ class PropertyController extends Controller
 
         try {
             $properties = Property::all();
-
         } catch (QueryException) {
 
-            if($api) {
+            if ($api) {
 
-            return response()->json(['error' => 'Error en la conexion con la BD'], 503);
-
+                return response()->json(['error' => 'Error en la conexion con la BD'], 503);
             } else {
 
                 $errors[] = 'Error en la conexion con la BD';
                 return view('properties.properties', ['errors' => $errors]);
             }
-
         }
 
-        if($api) {
+        if ($api) {
 
 
             if ($properties->isEmpty()) {
@@ -91,10 +91,9 @@ class PropertyController extends Controller
             }
 
             return $properties;
-
         }
 
-        if($properties->isEmpty() && $api === false) {
+        if ($properties->isEmpty() && $api === false) {
             $errors[] = 'No hay propiedades en la base de datos';
             return redirect()->back()->withErrors($errors)->withInput();
         }
@@ -115,21 +114,20 @@ class PropertyController extends Controller
     public function store(Request $request, $api = false)
     {
 
-        if(!$api) {
-            $v = $this->validateForms($request, true);
+        if (!$api) {
+            $v = $this->validateForms($request, false);
         } else {
-            $v = $this->validateForms($request, true, true);
+            $v = $this->validateForms($request, false, true);
         }
 
 
         // si falla la validacion
-        if($v->fails()) {
-            if(!$api) {
+        if ($v->fails()) {
+            if (!$api) {
                 return redirect()->back()->withErrors($v)->withInput();
             }
 
             return response()->json(['error_validacion' => $v->errors()], 404);
-
         }
 
         $errors = [];
@@ -144,55 +142,55 @@ class PropertyController extends Controller
         $property->comunidad = $request->input('comunidad');
         $property->codigo_postal = $request->input('codigo_postal');
 
-        if(!$property->save()) {
-            if(!$api) {
+        if (!$property->save()) {
+            if (!$api) {
                 $errors[] = "La propiedad no se pudo guardar.";
             }
             return response()->json(['error' => 'Hubo en error al guardar'], 422);
-
         }
 
-            // Verificar si hubo errores al guardar
+        // Verificar si hubo errores al guardar
         if (!empty($errors)) {
-            if(!$api) {
+            if (!$api) {
                 return redirect()->back()->withErrors($errors)->withInput();
             }
 
             return response()->json(['error' => 'Hubo en error al guardar'], 404);
-
         }
 
-        if(!$api) {
-        // Redirigir a una ruta específica con un mensaje de éxito
-        return Redirect::route('properties.show', ['id' => $property->id])->with('success', 'Propiedad creada con éxito');
+        if (!$api) {
+            // Redirigir a una ruta específica con un mensaje de éxito
+            return Redirect::route('properties.show', ['id' => $property->id])->with('success', 'Propiedad creada con éxito');
         }
 
-            return $property;
-
-
+        return $property;
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(string $id, $api = false)
     {
         $errors = [];
 
         $property = Property::findOrFail(intval($id));
 
 
-        if(!$property) {
+        if (!$property) {
             $errors[] = 'Hubo un problema al recuperar la propiedad';
             return redirect()->back()->withErrors($errors)->withInput();
         }
-        return view('properties.showProperty', compact('property'));
+        if (!$api) {
+            return view('properties.showProperty', compact('property'));
+        } else {
+            return $property;
+        }
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit($id)
     {
         $property = Property::findOrFail(intval($id));
 
@@ -202,21 +200,36 @@ class PropertyController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $api = false, $id = null)
     {
-        var_dump($id);
+
+        // Detectar si es una solicitud JSON y ajustar la obtención del ID
+        if (!request()->isJson()) {
+            $id = $request->input('id');
+        }
+
         $v = $this->validateForms($request, true);
 
-        if($v->fails()) {
-        return redirect()->back()->withErrors($v->errors())->withInput();
+        if ($v->fails()) {
+            if (!request()->isJson()) {
+                $errors = new MessageBag(['error_validacion' => $v->errors()]);
+                return redirect()->back()->withErrors($errors->get('error_validacion'))->withInput();
+            } else {
+                return response()->json(['error_validacion' => $v->errors(), request()->isJson()], 400);
+            }
         }
 
         $errors = [];
 
         try {
-            $property = Property::findOrFail($id);
 
-        } catch (ModelNotFoundException) {
+            $property = Property::findOrFail($id);
+        } catch (ModelNotFoundException $e) {
+
+            if (request()->isJson()) {
+                return response()->json(['error' => $e->getMessage()], 404);
+            }
+
             return redirect()->back()->withErrors(['error' => 'No se encontró la propiedad con ese ID'])->withInput();
         }
 
@@ -227,40 +240,52 @@ class PropertyController extends Controller
         $property->comunidad = $request->input('comunidad');
         $property->codigo_postal = $request->input('codigo_postal');
 
-        if(!$property->save()) {
+        if (!$property->save()) {
+
+            if (request()->isJson()) {
+                return response()->json(['error' => 'La propiedad no se pudo editar.'], 500);
+            }
             $errors[] = "La propiedad no se pudo editar.";
             return redirect()->back()->withErrors($errors)->withInput();
-
         }
 
-        //     // Verificar si hubo errores al guardar
-        // if (!empty($errors)) {
-        //     $errors[] = "No existe la propiedad con ese ID";
-        //     return redirect()->back()->withErrors($errors)->withInput();
-        // }
 
-        // Redirigir a una ruta específica con un mensaje de éxito
-        return redirect("/properties/$property->id")->with('success', '¡Ubicación Editada exitosamente!');
+        if (!request()->isJson()) {
+            return redirect("/properties/$property->id")->with('success', '¡Ubicación Editada exitosamente!');
+        } else {
+            return response()->json(['success' => 'Editado correctamente', $property], 200);
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(string $id ,$api = false )
     {
+
         try {
             // 1. Encontrar la propiedad
             $property = Property::findOrFail((int)$id);
 
             // 2. Verificar si la propiedad existe y eliminarla
             if ($property->delete()) {
+                if($api) {
+                return response()->json(['success' => "Borrado correctamente ID $property->id"], 200);
+
+                }
                 // 3. Redirigir con un mensaje de éxito
                 return redirect()->route('properties')->with('success', 'Propiedad eliminada con éxito.');
             } else {
+                if($api) {
+                return response()->json(['error' => 'Hubo un problema al eliminar la propiedad.'], 400);
+                }
                 // Si la eliminación falla, redirigir con un mensaje de error
                 return redirect()->route('properties.properties')->with('error', 'Hubo un problema al eliminar la propiedad.');
             }
-        } catch (ModelNotFoundException $exception) {
+        } catch (ModelNotFoundException) {
+            if($api) {
+                return response()->json(['error' => 'No se pudo eliminar'], 404);
+                }
             // Si la propiedad no se encuentra, redirigir con un mensaje de error
             return redirect()->route('properties.index')->with('error', 'La propiedad no existe.');
         }
