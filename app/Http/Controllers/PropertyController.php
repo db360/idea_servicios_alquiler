@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Validator;
 class PropertyController extends Controller
 {
 
-    private function validateForms(Request $request, $isUpdate = false) {
+    private function validateForms(Request $request, $isUpdate = false, $api = false) {
 
 
         $rules = [
@@ -29,7 +29,7 @@ class PropertyController extends Controller
             $rules['user_id'] = 'required|integer';
         }
 
-        $v = Validator::make($request->all(), $rules, [
+        $messages = [
             'user_id.required' => 'La :attribute es obligatoria',
             'user_id.integer' => 'La :attribute debe de ser un número entero',
             'title.required' => 'El :attribute es obligatorio',
@@ -40,11 +40,23 @@ class PropertyController extends Controller
             'address.required' => 'La :attribute es obligatoria',
             'address.string' => 'La :attribute se debe de componer de caracteres',
             'address.min' => 'La :attribute no puede contener menos de :min caracteres',
-        ]);
+        ];
+                // Si la solicitud es una solicitud API, maneja los datos en formato JSON
+        if ($api) {
+            // Convierte los datos JSON en un array asociativo
+            $data = json_decode($request->getContent(), true);
+            // Crea una instancia del validador con los datos recibidos y las reglas y mensajes de error comunes
+            $validator = Validator::make($data, $rules, $messages);
+        } else {
+            // Si la solicitud no es una solicitud API, maneja los datos de entrada como de costumbre
+            // Crea una instancia del validador con los datos recibidos y las reglas y mensajes de error comunes
+            $validator = Validator::make($request->all(), $rules, $messages);
+        }
 
-        $v->setAttributeNames(['user_id'=> 'ID de usuario', 'title' => 'título', 'description'=>'descripción', 'address' => 'dirección', 'city' => 'ciudad', 'codigo_posta' => 'código postal']);
 
-        return $v;
+        $validator->setAttributeNames(['user_id'=> 'ID de usuario', 'title' => 'título', 'description'=>'descripción', 'address' => 'dirección', 'city' => 'ciudad', 'codigo_posta' => 'código postal']);
+
+        return $validator;
     }
     /**
      * Display a listing of the resource.
@@ -52,7 +64,7 @@ class PropertyController extends Controller
     public function index($api = false)
     {
         $errors = [];
-        
+
         try {
             $properties = Property::all();
 
@@ -100,15 +112,24 @@ class PropertyController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, $api = false)
     {
 
-        $v = $this->validateForms($request, true);
+        if(!$api) {
+            $v = $this->validateForms($request, true);
+        } else {
+            $v = $this->validateForms($request, true, true);
+        }
 
 
         // si falla la validacion
         if($v->fails()) {
-            return redirect()->back()->withErrors($v)->withInput();
+            if(!$api) {
+                return redirect()->back()->withErrors($v)->withInput();
+            }
+
+            return response()->json(['error_validacion' => $v->errors()], 404);
+
         }
 
         $errors = [];
@@ -123,18 +144,32 @@ class PropertyController extends Controller
         $property->comunidad = $request->input('comunidad');
         $property->codigo_postal = $request->input('codigo_postal');
 
-        var_dump($property);
         if(!$property->save()) {
-            $errors[] = "La propiedad no se pudo guardar.";
+            if(!$api) {
+                $errors[] = "La propiedad no se pudo guardar.";
+            }
+            return response()->json(['error' => 'Hubo en error al guardar'], 422);
+
         }
 
             // Verificar si hubo errores al guardar
         if (!empty($errors)) {
-            return redirect()->back()->withErrors($errors)->withInput();
+            if(!$api) {
+                return redirect()->back()->withErrors($errors)->withInput();
+            }
+
+            return response()->json(['error' => 'Hubo en error al guardar'], 404);
+
         }
 
+        if(!$api) {
         // Redirigir a una ruta específica con un mensaje de éxito
-    return Redirect::route('properties.show', ['id' => $property->id])->with('success', 'Propiedad creada con éxito');
+        return Redirect::route('properties.show', ['id' => $property->id])->with('success', 'Propiedad creada con éxito');
+        }
+
+            return $property;
+
+
     }
 
     /**

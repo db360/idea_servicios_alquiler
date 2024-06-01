@@ -7,7 +7,7 @@
     <label for="user_id">user_id</label>
     <input type="text" name="user_id" id="user_id">
     <label for="title">title</label>
-    <input type="title" name="title" id="title">
+    <input type="text" name="title" id="title">
     <label for="description">description</label>
     <input type="text" name="description" id="description">
     <label for="address">address</label>

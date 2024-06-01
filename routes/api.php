@@ -22,5 +22,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::prefix('properties')->group(function(){
 
     Route::get('/', [PropertyAPIController::class, 'index'])->name('properties');
+    Route::post('/create', [PropertyAPIController::class, 'store'])->name('properties.create');
 
 });
